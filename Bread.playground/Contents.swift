@@ -1,4 +1,4 @@
-import Cocoa
+import Foundation
 
 
 public struct Bread {
@@ -58,38 +58,6 @@ var secondThread = Thread {
 firstThread.start()
 secondThread.start()
 
-//var shelf = [Bread]()
-//var condition = NSCondition()
-//var avalable = false
-//
-//var firstThread = Thread {
-//    for _ in 1...10 {
-//        condition.lock()
-//        shelf.insert(Bread.make(), at: 0)
-//        print("Done!")
-//        avalable = true
-//        condition.signal()
-//        condition.unlock()
-//        sleep(2)
-//    }
-//}
-//
-//var secondThread = Thread {
-//    for _ in 1...10 {
-//        while (!avalable) {
-//            condition.wait()
-//        }
-//
-//        shelf.removeFirst().bake()
-//
-//        if shelf.count < 1 {
-//            avalable = false
-//        }
-//    }
-//}
-//
-//firstThread.start()
-//secondThread.start()
 
 
 
