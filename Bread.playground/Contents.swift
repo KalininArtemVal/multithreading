@@ -38,7 +38,6 @@ struct BreadStorage {
 
 //поток для создания
 class FirstThread: Thread {
-    var count = 1
     var bread = BreadStorage()
     
     override func main() {
