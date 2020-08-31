@@ -7,57 +7,79 @@ public struct Bread {
         case medium
         case big
     }
-    
     public let breadType: BreadType
-    
     public static func make() -> Bread {
         guard let breadType = Bread.BreadType(rawValue: UInt32(arc4random_uniform(3) + 1)) else {
             fatalError("Incorrect random value")
         }
-        
         return Bread(breadType: breadType)
     }
-    
     public func bake() {
         let bakeTime = breadType.rawValue
         sleep(UInt32(bakeTime))
     }
 }
 
-var storage = [Bread]()
-var avalible = false
-var conditional = NSCondition()
+
+struct BreadStorage {
+    var storage = [Bread]()
+    var conditional = NSCondition()
+    
+    mutating func push() {
+        let bread = Bread.make()
+        storage.append(bread)
+        print("Хлеб в печи")
+    }
+    
+    mutating func pop() {
+        storage.removeLast().bake()
+    }
+}
 
 //поток для создания
-var firstThread = Thread {
-    for _ in 1...10 {
-        conditional.lock()
-        let done = Bread.make()
-        storage.insert(done, at: 0)
-        print("Done!")
-        avalible = true
-        
-        conditional.unlock()
-        sleep(2)
+class FirstThread: Thread {
+    var count = 1
+    var bread = BreadStorage()
+    
+    override func main() {
+        let myTimer = Timer(timeInterval: 2, target: self, selector: #selector(pushInThread), userInfo: nil, repeats: true)
+        RunLoop.current.add(myTimer, forMode: RunLoop.Mode.common)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 20))
+        print("ХЛЕБОПЕЧКА ЗАКРЫТА!")
+    }
+    
+    @objc func pushInThread() {
+        bread.conditional.lock()
+        self.bread.push()
+        bread.conditional.signal()
+        bread.conditional.unlock()
     }
 }
+
+let firstThread = FirstThread()
 //поток для работы
-var secondThread = Thread {
-    for _ in 1...10 {
-        while (!avalible) {
-            conditional.wait()
+class SecondThread: Thread {
+    
+    override func main() {
+        let mySecondTimer = Timer(timeInterval: 0 , target: self, selector: #selector(popInThread), userInfo: nil, repeats: true)
+        RunLoop.current.add(mySecondTimer, forMode: RunLoop.Mode.common)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 20))
+        print("ЗАКОНЧИЛ")
+    }
+    
+    @objc func popInThread() {
+        while firstThread.bread.storage.isEmpty {
+            print("жду")
+            firstThread.bread.conditional.wait()
         }
-        storage.removeFirst()
-        
-        if storage.count < 1 {
-            avalible = false
-        }
+        firstThread.bread.pop()
+        print("вытащил")
     }
 }
+
+let secondThread = SecondThread()
 
 firstThread.start()
 secondThread.start()
-
-
 
 
