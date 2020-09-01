@@ -23,7 +23,7 @@ public struct Bread {
 
 struct BreadStorage {
     var storage = [Bread]()
-    var conditional = NSCondition()
+    var isAvalible = false
     
     mutating func push() {
         let bread = Bread.make()
@@ -37,8 +37,9 @@ struct BreadStorage {
 }
 
 //поток для создания
-class FirstThread: Thread {
+class ParentThread: Thread {
     var bread = BreadStorage()
+    var conditional = NSCondition()
     
     override func main() {
         let myTimer = Timer(timeInterval: 2, target: self, selector: #selector(pushInThread), userInfo: nil, repeats: true)
@@ -48,37 +49,38 @@ class FirstThread: Thread {
     }
     
     @objc func pushInThread() {
-        bread.conditional.lock()
+        conditional.lock()
         self.bread.push()
-        bread.conditional.signal()
-        bread.conditional.unlock()
+        bread.isAvalible = true
+        conditional.signal()
+        conditional.unlock()
     }
 }
 
-let firstThread = FirstThread()
+let parentThread = ParentThread()
 //поток для работы
-class SecondThread: Thread {
+class WorkingThread: Thread {
     
     override func main() {
         let mySecondTimer = Timer(timeInterval: 0 , target: self, selector: #selector(popInThread), userInfo: nil, repeats: true)
         RunLoop.current.add(mySecondTimer, forMode: RunLoop.Mode.common)
-        RunLoop.current.run(until: Date(timeIntervalSinceNow: 20))
-        print("ЗАКОНЧИЛ")
+        RunLoop.current.run()
     }
     
     @objc func popInThread() {
-        while firstThread.bread.storage.isEmpty {
+        while (!parentThread.bread.isAvalible) {
             print("жду")
-            firstThread.bread.conditional.wait()
+            parentThread.conditional.wait()
         }
-        firstThread.bread.pop()
+        parentThread.bread.pop()
+        parentThread.bread.isAvalible = false
         print("вытащил")
     }
 }
 
-let secondThread = SecondThread()
+let workingThread = WorkingThread()
 
-firstThread.start()
-secondThread.start()
+parentThread.start()
+workingThread.start()
 
 
