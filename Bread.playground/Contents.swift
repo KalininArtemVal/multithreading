@@ -1,4 +1,4 @@
-import Cocoa
+import Foundation
 
 
 public struct Bread {
@@ -7,89 +7,80 @@ public struct Bread {
         case medium
         case big
     }
-    
     public let breadType: BreadType
-    
     public static func make() -> Bread {
         guard let breadType = Bread.BreadType(rawValue: UInt32(arc4random_uniform(3) + 1)) else {
             fatalError("Incorrect random value")
         }
-        
         return Bread(breadType: breadType)
     }
-    
     public func bake() {
         let bakeTime = breadType.rawValue
         sleep(UInt32(bakeTime))
     }
 }
 
-var storage = [Bread]()
-var avalible = false
-var conditional = NSCondition()
+
+struct BreadStorage {
+    var storage = [Bread]()
+    var isAvalible = false
+    
+    mutating func push() {
+        let bread = Bread.make()
+        storage.append(bread)
+        print("Хлеб в печи")
+    }
+    
+    mutating func pop() {
+        storage.removeLast().bake()
+    }
+}
 
 //поток для создания
-var firstThread = Thread {
-    for _ in 1...10 {
+class ParentThread: Thread {
+    var bread = BreadStorage()
+    var conditional = NSCondition()
+    
+    override func main() {
+        let myTimer = Timer(timeInterval: 2, target: self, selector: #selector(pushInThread), userInfo: nil, repeats: true)
+        RunLoop.current.add(myTimer, forMode: RunLoop.Mode.common)
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 20))
+        print("ХЛЕБОПЕЧКА ЗАКРЫТА!")
+    }
+    
+    @objc func pushInThread() {
         conditional.lock()
-        let done = Bread.make()
-        storage.insert(done, at: 0)
-        print("Done!")
-        avalible = true
-        
+        self.bread.push()
+        bread.isAvalible = true
+        conditional.signal()
         conditional.unlock()
-        sleep(2)
     }
 }
+
+let parentThread = ParentThread()
 //поток для работы
-var secondThread = Thread {
-    for _ in 1...10 {
-        while (!avalible) {
-            conditional.wait()
+class WorkingThread: Thread {
+    
+    override func main() {
+        let mySecondTimer = Timer(timeInterval: 0 , target: self, selector: #selector(popInThread), userInfo: nil, repeats: true)
+        RunLoop.current.add(mySecondTimer, forMode: RunLoop.Mode.common)
+        RunLoop.current.run()
+    }
+    
+    @objc func popInThread() {
+        while (!parentThread.bread.isAvalible) {
+            print("жду")
+            parentThread.conditional.wait()
         }
-        storage.removeFirst()
-        
-        if storage.count < 1 {
-            avalible = false
-        }
+        parentThread.bread.pop()
+        parentThread.bread.isAvalible = false
+        print("вытащил")
     }
 }
 
-firstThread.start()
-secondThread.start()
+let workingThread = WorkingThread()
 
-//var shelf = [Bread]()
-//var condition = NSCondition()
-//var avalable = false
-//
-//var firstThread = Thread {
-//    for _ in 1...10 {
-//        condition.lock()
-//        shelf.insert(Bread.make(), at: 0)
-//        print("Done!")
-//        avalable = true
-//        condition.signal()
-//        condition.unlock()
-//        sleep(2)
-//    }
-//}
-//
-//var secondThread = Thread {
-//    for _ in 1...10 {
-//        while (!avalable) {
-//            condition.wait()
-//        }
-//
-//        shelf.removeFirst().bake()
-//
-//        if shelf.count < 1 {
-//            avalable = false
-//        }
-//    }
-//}
-//
-//firstThread.start()
-//secondThread.start()
-
+parentThread.start()
+workingThread.start()
 
 
